@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,7 +9,14 @@
       --bg-dark: #0f172a; --card-bg: #1e293b; --border: #334155; --text: #f8fafc; 
       --primary: #38bdf8; 
     }
-    * { scrollbar-width: none !important; -ms-overflow-style: none !important; box-sizing: border-box; }
+    /* スマホ対応: ズーム防止（touch-action）とタップ時のハイライト消去を追加 */
+    * { 
+      scrollbar-width: none !important; 
+      -ms-overflow-style: none !important; 
+      box-sizing: border-box; 
+      touch-action: manipulation; 
+      -webkit-tap-highlight-color: transparent; 
+    }
     *::-webkit-scrollbar { display: none !important; }
     
     body { 
@@ -119,27 +125,15 @@
     .unit-header-btn { display: flex; align-items: center; justify-content: center; color: #ffffff; padding-right: 5px; }
     .unit-header-btn svg { width: 34px; height: 34px; fill: currentColor; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.25)); }
 
-    /* セクション区切り（間隔調整済み） */
+    /* セクション区切り */
     .section-divider {
-      display: flex;
-      align-items: center;
-      width: 85%;
-      margin: 5px 0 10px 0; /* 余白を小さく */
-      font-size: 1.6rem;
-      font-weight: 900;
-      color: #94a3b8;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      letter-spacing: 2px;
-      z-index: 10;
+      display: flex; align-items: center; width: 85%; margin: 5px 0 10px 0;
+      font-size: 1.6rem; font-weight: 900; color: #94a3b8;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5); letter-spacing: 2px; z-index: 10;
     }
     .section-divider::before,
     .section-divider::after {
-      content: "";
-      flex: 1;
-      height: 2px;
-      background-color: #475569;
-      margin: 0 15px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      content: ""; flex: 1; height: 2px; background-color: #475569; margin: 0 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.5);
     }
 
     /* 蛇行ユニット */
@@ -155,14 +149,21 @@
 
     .progress-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3)); }
     .ring-bg { fill: #1e293b; }
+    
+    /* 沈み込むボタンのアニメーション設定 */
     .unit-button { 
       position: relative; width: 85px; height: 85px; 
-      border-radius: 50%; 
-      display: flex; align-items: center; justify-content: center; 
-      cursor: pointer; box-shadow: 0 8px 0 rgba(0,0,0,0.25), 0 12px 15px rgba(0,0,0,0.4); 
-      z-index: 10; border: none; transition: all 0.15s ease; 
+      border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+      cursor: pointer; box-shadow: 0 10px 15px rgba(0,0,0,0.4); 
+      z-index: 10; border: none; border-bottom: 8px solid; /* 下枠を太く */
+      transition: all 0.1s ease; 
     }
-    .unit-button:active { transform: translateY(6px); box-shadow: 0 2px 0 rgba(0,0,0,0.25), 0 5px 8px rgba(0,0,0,0.4); }
+    .unit-button:active { 
+      transform: translateY(6px); /* 押し込んだ深さ */
+      border-bottom-width: 2px;   /* ボーダーを減らして立体感を出す */
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4); 
+    }
+    
     .unit-button span { color: white; font-size: 2.5rem; font-weight: 900; text-shadow: 0 4px 0px rgba(0,0,0,0.25); }
     .unit-button svg { width: 45px; height: 45px; fill: white; filter: drop-shadow(0 3px 0px rgba(0,0,0,0.25)); }
 
@@ -317,6 +318,13 @@
   </div>
 
   <script>
+    // ピンチズーム（2本指でのズーム）無効化
+    document.addEventListener('touchmove', function(event) {
+      if (event.touches && event.touches.length > 1) {
+        event.preventDefault();
+      }
+    }, { passive: false });
+
     let speechWarmupDone = false, bgmStarted = false;
     let audioCtx = null;
     let audioUnlocked = false;
@@ -343,10 +351,14 @@
         audioUnlocked = true;
       }
 
-      if (!speechWarmupDone && 'speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance(''); u.volume = 0; window.speechSynthesis.speak(u);
-        speechWarmupDone = true;
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.resume(); // iOS対策としてresumeを追加
+        if (!speechWarmupDone) {
+          const u = new SpeechSynthesisUtterance(''); u.volume = 0; window.speechSynthesis.speak(u);
+          speechWarmupDone = true;
+        }
       }
+      
       if (!bgmStarted) {
         const bgm = document.getElementById('bgm-audio');
         if (bgm) { bgm.volume = 0.2; bgm.play().then(() => { bgmStarted = true; }).catch(e => console.log(e)); }
@@ -390,14 +402,13 @@
       }
     }
 
+    // 読み上げ処理: スマホでの音無し防止のためsetTimeoutを削除し即時実行
     function speakWord(text) {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        setTimeout(() => {
-          const u = new SpeechSynthesisUtterance(text);
-          u.lang = 'en-US'; u.rate = 1.0; u.pitch = 1.0;
-          window.speechSynthesis.speak(u);
-        }, 10);
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US'; u.rate = 1.0; u.pitch = 1.0;
+        window.speechSynthesis.speak(u);
       }
     }
 
@@ -645,7 +656,8 @@
           }
           ringHtml += `</svg>`;
           
-          unit.innerHTML = `${ringHtml}<button class="unit-button" style="background:${info.color}; border-bottom: 6px solid ${info.shadow};" onclick="startQuiz('${lv}', ${i})">${icon}</button>`;
+          /* ボタンの生成：border-bottom-colorで色を指定し、太さはCSSで制御する */
+          unit.innerHTML = `${ringHtml}<button class="unit-button" style="background:${info.color}; border-bottom-color: ${info.shadow};" onclick="startQuiz('${lv}', ${i})">${icon}</button>`;
           
           if (!firstUnfinishedUnit && !isFullCleared) {
             firstUnfinishedUnit = unit;
